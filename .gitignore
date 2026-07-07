@@ -19,9 +19,8 @@ env/
 .streamlit/secrets.toml
 
 # Local data stores
-*.sqlite
-*.sqlite3
-*.db
+*.sqlite*
+*.db*
 
 # OS/editor
 .DS_Store
@@ -29,3 +28,4 @@ env/
 .vscode/
 AGENTS.md
 docs/BUILD_SPEC.md
+docs/INTERVIEW_PREP.md

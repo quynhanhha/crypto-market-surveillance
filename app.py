@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 import sqlite3
 from time import monotonic
@@ -37,6 +38,8 @@ from src.ui.pages import (
 from src.utils.logging import configure_logging
 
 
+LOGGER = logging.getLogger(__name__)
+
 APP_TITLE = "Crypto Market Surveillance Analytics"
 PROJECT_ROOT = Path(__file__).resolve().parent
 DB_PATH = PROJECT_ROOT / "surveillance.db"
@@ -68,14 +71,18 @@ def main() -> None:
     conn = _connection()
     create_schema(conn)
 
-    loaded = _initialize_data(conn)
+    loaded = _safe_initialize_data(conn)
+    if loaded is None:
+        return
     all_candles = fetch_market_candles(conn)
     all_alerts = fetch_alerts(conn)
     controls = render_sidebar(all_candles, loaded["metadata"], all_alerts)
     _maybe_auto_refresh(controls["auto_refresh"])
 
     if controls["refresh"]:
-        loaded = _initialize_data(conn)
+        loaded = _safe_initialize_data(conn)
+        if loaded is None:
+            return
         all_candles = fetch_market_candles(conn)
         all_alerts = fetch_alerts(conn)
 
@@ -101,6 +108,20 @@ def _connection() -> sqlite3.Connection:
     if "db_conn" not in st.session_state:
         st.session_state.db_conn = connect_sqlite(DB_PATH)
     return st.session_state.db_conn
+
+
+def _safe_initialize_data(conn: sqlite3.Connection) -> dict[str, object] | None:
+    """Run `_initialize_data`, turning any failure into a user-facing error instead of a crash."""
+    try:
+        return _initialize_data(conn)
+    except Exception:
+        LOGGER.exception("Failed to load market data, seed synthetic data, or run detection rules")
+        st.error(
+            "Something went wrong while loading data or running detection rules. "
+            "Try refreshing the page; if the problem persists, check the app logs."
+        )
+        st.stop()
+        return None
 
 
 def _initialize_data(conn: sqlite3.Connection) -> dict[str, object]:

@@ -33,7 +33,7 @@ These aren't called out elsewhere in the docs, but are visible in the code and w
 
 - There is no authentication or authorization anywhere in `app.py` or `src/ui/` — anyone who can reach the app can view alerts and change their status.
 - The app holds a single SQLite connection in `st.session_state` (`app.py`) — this is a single-user, single-session model with no multi-tenant isolation.
-- `src/config/settings.py` is an empty placeholder — there is no environment-based configuration layer yet; all configuration is the static constants in `src/config/thresholds.py`.
+- There is no environment-based configuration layer — all configuration is the static constants in `src/config/thresholds.py` and the module-level constants in `app.py`.
 - `surveillance.db` (and a dated backup file) are committed directly in the repository working tree rather than generated at runtime or excluded via `.gitignore`.
 - Detection thresholds are static constants, not adaptive — there is no feedback loop from analyst dispositions back into the thresholds (tracked as future work in `README.md`).
 - Market data refresh is a manual/timed poll (`_maybe_auto_refresh`, 60-second interval) via Streamlit rerun, not a real-time or streaming pipeline.

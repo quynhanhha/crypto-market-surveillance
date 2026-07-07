@@ -104,4 +104,4 @@ Exact thresholds live in `src/config/thresholds.py`; scoring lives in `src/detec
 
 ## Config
 
-`src/config/thresholds.py` holds every detection threshold and synthetic-generation parameter (seed, account counts, window sizes). `src/config/settings.py` is currently an empty placeholder — there is no environment-based runtime configuration layer yet.
+`src/config/thresholds.py` holds every detection threshold and synthetic-generation parameter (seed, account counts, window sizes). There is no environment-based runtime configuration layer — deployment-level settings (DB path, default exchange/symbols/timeframe) are module-level constants in `app.py`.

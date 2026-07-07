@@ -4,5 +4,4 @@ numpy==2.3.3
 plotly==6.3.1
 ccxt==4.5.54
 SQLAlchemy==2.0.44
-python-dotenv==1.2.1
 reportlab==4.5.1

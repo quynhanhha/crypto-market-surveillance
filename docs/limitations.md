@@ -6,7 +6,7 @@ This is a surveillance analytics prototype, not a production control room, a tra
 
 - Public market data cannot prove account ownership, coordination, or intent — it can only flag statistically unusual behavior. Alerts are surveillance leads, not accusations.
 - Synthetic account activity is deliberately realistic but does not represent real accounts or transactions.
-- Spoofing/Layering severity is capped at Low because `linked_coordination_confirmed` is hardcoded `False` — coordination between accounts is not modeled in the current synthetic dataset. Wiring this to `account_links` would unlock High-severity spoofing alerts.
+- `linked_coordination_confirmed` in the spoofing rule is wired to `account_links` (checks the opposite-side trade counterparty against linked pairs at or above the confidence threshold), but the current synthetic dataset's injected spoofing scenario doesn't route that trade through a linked account, so its demo alert still surfaces at Low. Under the current point weights the rule's ceiling is Medium, not High, even with coordination confirmed.
 - SQLite is appropriate for local and single-session demo use, not for multi-user or persistent production deployments (see `docs/architecture.md` for why SQLite was chosen).
 - The fallback data path makes no distinction between transient API failures and permanent unavailability — there is no retry or backoff logic.
 - API availability and symbol coverage depend entirely on the external CCXT exchange source (Coinbase by default).
@@ -41,4 +41,4 @@ These aren't called out elsewhere in the docs, but are visible in the code and w
 
 ## Future work
 
-See `README.md` for the full list; the highlights are replacing SQLite with PostgreSQL for concurrent/persistent production use, wiring spoofing coordination confirmation to `account_links`, adding retry/backoff to the market data fallback, richer case management workflows, broader exchange/symbol coverage, and analyst-feedback-driven threshold tuning.
+See `README.md` for the full list; the highlights are replacing SQLite with PostgreSQL for concurrent/persistent production use, extending the synthetic spoofing scenario so the now-wired coordination check is actually exercised by the demo data, adding retry/backoff to the market data fallback, richer case management workflows, broader exchange/symbol coverage, and analyst-feedback-driven threshold tuning.

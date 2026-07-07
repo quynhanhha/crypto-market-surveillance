@@ -161,7 +161,10 @@ def _synthetic_alerts(tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
         tables["synthetic_trades"], tables["account_links"]
     )
     spoof_alerts = detect_spoofing_layering(
-        tables["synthetic_orders"], tables["synthetic_trades"], tables["accounts"]
+        tables["synthetic_orders"],
+        tables["synthetic_trades"],
+        tables["accounts"],
+        tables["account_links"],
     )
     return pd.concat([wash_alerts, spoof_alerts], ignore_index=True)
 

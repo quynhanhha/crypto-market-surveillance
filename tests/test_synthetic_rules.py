@@ -10,6 +10,11 @@ from src.detection.spoofing_layering import detect_spoofing_layering
 from src.detection.wash_trading import detect_wash_trading
 
 
+def empty_account_links() -> pd.DataFrame:
+    """Return an account_links frame with no rows, for tests that don't exercise linking."""
+    return pd.DataFrame(columns=["account_id_a", "account_id_b", "link_type", "confidence"])
+
+
 def test_detect_wash_trading_returns_alert() -> None:
     """Linked round-trip trading with low net position change triggers."""
     trades = wash_trade_rows()
@@ -115,7 +120,7 @@ def test_detect_spoofing_layering_returns_alert() -> None:
     """Repeated large cancellations followed by opposite trades trigger."""
     orders, trades, accounts = spoofing_rows(include_opposite_trades=True)
 
-    alerts = detect_spoofing_layering(orders, trades, accounts)
+    alerts = detect_spoofing_layering(orders, trades, accounts, empty_account_links())
 
     assert len(alerts) == 1
     alert = alerts.iloc[0]
@@ -128,6 +133,7 @@ def test_detect_spoofing_layering_returns_alert() -> None:
         "average_cancel_seconds",
         "opposite_side_trade_count",
         "notional_value",
+        "linked_counterparty_confirmed",
     }
 
 
@@ -135,7 +141,7 @@ def test_detect_spoofing_layering_requires_opposite_trades() -> None:
     """Large fast cancellations alone do not trigger spoofing/layering."""
     orders, trades, accounts = spoofing_rows(include_opposite_trades=False)
 
-    alerts = detect_spoofing_layering(orders, trades, accounts)
+    alerts = detect_spoofing_layering(orders, trades, accounts, empty_account_links())
 
     assert alerts.empty
 
@@ -145,7 +151,7 @@ def test_detect_spoofing_layering_ignores_normal_cancellations() -> None:
     orders, trades, accounts = spoofing_rows(include_opposite_trades=True)
     orders.loc[orders["order_id"].str.startswith("SPOOF_"), "quantity"] = 1.0
 
-    alerts = detect_spoofing_layering(orders, trades, accounts)
+    alerts = detect_spoofing_layering(orders, trades, accounts, empty_account_links())
 
     assert alerts.empty
 
@@ -154,7 +160,7 @@ def test_detect_spoofing_layering_requires_minimum_repeat_count() -> None:
     """Fewer than three repeated events do not trigger."""
     orders, trades, accounts = spoofing_rows(include_opposite_trades=True, spoof_count=2)
 
-    alerts = detect_spoofing_layering(orders, trades, accounts)
+    alerts = detect_spoofing_layering(orders, trades, accounts, empty_account_links())
 
     assert alerts.empty
 
@@ -164,10 +170,37 @@ def test_detect_spoofing_layering_uses_historical_account_average() -> None:
     orders, trades, accounts = spoofing_rows(include_opposite_trades=True)
     orders.loc[orders["order_id"].str.startswith("SPOOF_"), "quantity"] = 10.0
 
-    alerts = detect_spoofing_layering(orders, trades, accounts)
+    alerts = detect_spoofing_layering(orders, trades, accounts, empty_account_links())
 
     assert len(alerts) == 1
     assert alerts.iloc[0]["account_id"] == "ACC_S"
+
+
+def test_detect_spoofing_layering_confirms_linked_counterparty() -> None:
+    """A linked opposite-side counterparty raises severity above the unlinked baseline."""
+    orders, trades, accounts = spoofing_rows(include_opposite_trades=True)
+    links = pd.DataFrame(
+        [
+            {
+                "link_id": 1,
+                "account_id_a": "ACC_S",
+                "account_id_b": "ACC_M",
+                "link_type": "beneficial_ownership",
+                "confidence": 0.90,
+            }
+        ]
+    )
+
+    alerts = detect_spoofing_layering(orders, trades, accounts, links)
+
+    assert len(alerts) == 1
+    alert = alerts.iloc[0]
+    assert alert["severity_score"] == 50
+    assert alert["severity"] == "Medium"
+    linked_evidence = next(
+        item for item in alert["evidence"] if item["metric_name"] == "linked_counterparty_confirmed"
+    )
+    assert linked_evidence["metric_value"] == 1.0
 
 
 def wash_trade_rows(trade_count: int = 6, round_trip: bool = True) -> pd.DataFrame:

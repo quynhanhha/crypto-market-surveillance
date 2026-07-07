@@ -173,9 +173,9 @@ All scoring lives in `src/detection/severity.py`. No rule file computes its own 
 | Pump-and-Dump, no cross-rule | 65 | Medium |
 | Pump-and-Dump, with cross-rule | 90 | High |
 | Wash Trading | 70 (25 + 20 + 10 + 15) | Medium |
-| Spoofing/Layering | 40 (25 + 0 + 15) | Low |
+| Spoofing/Layering | 60 (25 + 20 + 15) | Medium |
 
-Note: Spoofing/Layering severity is capped at Low because `linked_coordination_confirmed` is hardcoded `False` — the synthetic dataset has no coordination signal between accounts in the spoofing scenario. A production deployment would wire this to the `account_links` table.
+Note: `linked_coordination_confirmed` is wired to `account_links` — an alert's opposite-side counterparty is checked against linked account pairs at or above `LINK_CONFIDENCE_THRESHOLD` (0.70). In the current synthetic dataset the injected spoofing scenario's counterparty (`SCENARIO_MARKET_MAKER`) is not the account actually linked to the spoofing account, so today's demo alert still surfaces at Low — the detection logic is correct, the synthetic scenario just doesn't happen to exercise the coordinated path. Note also that under the current point weights, Spoofing/Layering's ceiling is Medium, not High, even with coordination confirmed.
 
 ## Database Schema
 
@@ -295,7 +295,7 @@ python3 -m ruff check .
 - This is a surveillance prototype, not a production control room.
 - Public market data cannot prove account ownership, coordination, or intent — it can only flag statistically unusual behavior.
 - Synthetic account activity is deliberately realistic but does not represent real accounts or transactions.
-- Spoofing/Layering severity is capped at Low because coordination between accounts is not modeled in the current synthetic dataset.
+- Spoofing/Layering coordination is checked against `account_links`, but the current synthetic dataset's spoofing scenario doesn't route the opposite-side trade through a linked account, so its demo alert still surfaces at Low.
 - SQLite is appropriate for local and single-session demo use, not for multi-user or persistent production deployments.
 - The fallback data path makes no distinction between transient API failures and permanent unavailability — no retry logic exists.
 - API availability and symbol coverage depend on the external CCXT exchange source.
@@ -303,7 +303,7 @@ python3 -m ruff check .
 ## Future Work
 
 - Replace SQLite with a persistent production database (PostgreSQL).
-- Wire `linked_coordination_confirmed` in the spoofing rule to the `account_links` table to enable High-severity spoofing alerts.
+- Extend the synthetic spoofing scenario to route its opposite-side trade through a linked account, so the now-wired coordination check is actually exercised by the demo data.
 - Add exponential backoff and staleness gating to the market data fallback path.
 - Add richer case management and analyst workflow controls.
 - Integrate more exchange venues and deeper market coverage.

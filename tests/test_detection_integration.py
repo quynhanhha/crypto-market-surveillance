@@ -109,6 +109,7 @@ def run_detection_pipeline(
                 synthetic_tables["synthetic_orders"],
                 synthetic_tables["synthetic_trades"],
                 synthetic_tables["accounts"],
+                synthetic_tables["account_links"],
             ),
         ],
         ignore_index=True,

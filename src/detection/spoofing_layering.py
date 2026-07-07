@@ -9,6 +9,7 @@ import pandas as pd
 
 from src.config.thresholds import (
     LARGE_ORDER_MULTIPLIER,
+    LINK_CONFIDENCE_THRESHOLD,
     MAX_CANCEL_SECONDS,
     MIN_NOTIONAL,
     MIN_REPEATED_EVENTS,
@@ -29,6 +30,7 @@ def detect_spoofing_layering(
     synthetic_orders: pd.DataFrame,
     synthetic_trades: pd.DataFrame,
     accounts: pd.DataFrame,
+    account_links: pd.DataFrame,
 ) -> pd.DataFrame:
     """Detect repeated large fast cancellations followed by opposite-side trades."""
     required_order_columns = {
@@ -56,6 +58,10 @@ def detect_spoofing_layering(
         raise ValueError(f"Synthetic trades missing columns: {sorted(missing_trade_columns)}")
     if "account_id" not in accounts.columns:
         raise ValueError("Accounts missing columns: ['account_id']")
+    required_link_columns = {"account_id_a", "account_id_b", "link_type", "confidence"}
+    missing_link_columns = required_link_columns.difference(account_links.columns)
+    if missing_link_columns:
+        raise ValueError(f"Account links missing columns: {sorted(missing_link_columns)}")
     if synthetic_orders.empty or synthetic_trades.empty or accounts.empty:
         return _empty_alerts()
 
@@ -97,12 +103,24 @@ def detect_spoofing_layering(
         return _empty_alerts()
 
     events_frame = pd.DataFrame(events)
+    linked_pairs = _qualifying_linked_pairs(account_links)
     alerts = [
-        _alert_from_events(account_id, symbol, group)
+        _alert_from_events(account_id, symbol, group, linked_pairs)
         for (account_id, symbol), group in events_frame.groupby(["account_id", "symbol"], sort=False)
         if len(group) >= MIN_REPEATED_EVENTS
     ]
     return pd.DataFrame(alerts)
+
+
+def _qualifying_linked_pairs(account_links: pd.DataFrame) -> set[tuple[str, str]]:
+    """Return normalized (account_a, account_b) pairs linked at or above the confidence threshold."""
+    if account_links.empty:
+        return set()
+    qualifying = account_links[account_links["confidence"] >= LINK_CONFIDENCE_THRESHOLD]
+    return {
+        tuple(sorted((str(row["account_id_a"]), str(row["account_id_b"]))))
+        for _, row in qualifying.iterrows()
+    }
 
 
 def _event_if_opposite_trade(order: pd.Series, trades: pd.DataFrame) -> dict[str, Any] | None:
@@ -122,6 +140,11 @@ def _event_if_opposite_trade(order: pd.Series, trades: pd.DataFrame) -> dict[str
     if opposite_trades.empty:
         return None
     first_trade = opposite_trades.sort_values("timestamp").iloc[0]
+    counterparty_account_id = (
+        str(first_trade["seller_account_id"])
+        if str(order["side"]) == "sell"
+        else str(first_trade["buyer_account_id"])
+    )
     return {
         "account_id": account_id,
         "symbol": symbol,
@@ -130,18 +153,28 @@ def _event_if_opposite_trade(order: pd.Series, trades: pd.DataFrame) -> dict[str
         "trade_time": first_trade["timestamp"],
         "cancel_seconds": float(order["cancel_seconds"]),
         "notional_value": float(order["notional_value"]),
+        "counterparty_account_id": counterparty_account_id,
     }
 
 
-def _alert_from_events(account_id: str, symbol: str, events: pd.DataFrame) -> dict[str, Any]:
+def _alert_from_events(
+    account_id: str,
+    symbol: str,
+    events: pd.DataFrame,
+    linked_pairs: set[tuple[str, str]],
+) -> dict[str, Any]:
     start_time = events["order_time"].min().isoformat()
     end_time = events["trade_time"].max().isoformat()
     repeated_count = int(len(events))
     total_notional = float(events["notional_value"].sum())
     average_cancel_seconds = float(events["cancel_seconds"].mean())
+    linked_coordination_confirmed = any(
+        tuple(sorted((account_id, str(counterparty)))) in linked_pairs
+        for counterparty in events["counterparty_account_id"]
+    )
     score = spoofing_layering_score(
         repeated_count=repeated_count,
-        linked_coordination_confirmed=False,
+        linked_coordination_confirmed=linked_coordination_confirmed,
         high_notional_confirmed=total_notional >= MIN_NOTIONAL,
     )
     severity = severity_from_score(score)
@@ -184,6 +217,13 @@ def _alert_from_events(account_id: str, symbol: str, events: pd.DataFrame) -> di
                 "Opposite-side trades after cancellation.",
             ),
             _evidence("notional_value", total_notional, MIN_NOTIONAL, ">=", "Total cancelled order notional."),
+            _evidence(
+                "linked_counterparty_confirmed",
+                1.0 if linked_coordination_confirmed else 0.0,
+                None,
+                None,
+                f"Opposite-side counterparty is a linked account (confidence >= {LINK_CONFIDENCE_THRESHOLD}).",
+            ),
         ],
     }
 

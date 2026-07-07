@@ -272,14 +272,14 @@ python3 -m pytest
 python3 -m ruff check .
 ```
 
-84 tests across 16 files:
+85 tests across 16 files:
 
 | File | Tests | What it covers |
 |---|---|---|
 | `test_volume_spike.py` | 4 | fires above threshold, ignores below, baseline excludes current candle via `shift(1)`, score scales with z-score band |
 | `test_price_anomaly.py` | 4 | fires on extreme return, ignores normal, handles zero open and NaN safely, negative return triggers |
 | `test_pump_dump.py` | 5 | all conditions fire, missing reversal suppresses, missing volume suppresses, cross-rule score boost |
-| `test_synthetic_rules.py` | 10 | wash trading (fires / no link / low net position / low confidence) and spoofing (fires / repeat count / opposite trades / per-account baseline / normal cancel rates) |
+| `test_synthetic_rules.py` | 11 | wash trading (fires / no link / low net position / low confidence) and spoofing (fires / repeat count / opposite trades / per-account baseline / normal cancel rates / linked counterparty raises severity) |
 | `test_alert_dedup.py` | 5 | ON CONFLICT skip, FK rejects orphan evidence, status preserved on re-insert, different symbols produce different keys, cross-process hash determinism |
 | `test_market_ingestion.py` | 13 | 6 distinct fallback trigger paths (exchange error, rate limit, empty response, malformed rows, unsupported exchange, unsupported symbol), bad fallback CSV regeneration, normalization rejects non-finite values, determinism |
 | `test_detection_integration.py` | 4 | full pipeline: DB init → seed synthetic tables → detect → dedup → PDF report |

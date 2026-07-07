@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import logging
 import random
 import sys
 from collections.abc import Iterable
@@ -35,6 +36,10 @@ SPOOF_EVENT_COUNT = thresholds.SPOOF_EVENT_COUNT
 SYMBOL_BASE_PRICES = thresholds.SYMBOL_BASE_PRICES
 WASH_ROUND_TRIPS_PER_PAIR = thresholds.WASH_ROUND_TRIPS_PER_PAIR
 
+_logging_utils = importlib.import_module("src.utils.logging")
+configure_logging = _logging_utils.configure_logging
+
+LOGGER = logging.getLogger(__name__)
 
 DATA_DIR = PROJECT_ROOT / "data"
 SCENARIO_MARKET_MAKER = "ACC_0061"
@@ -537,6 +542,7 @@ def export_synthetic_data(output_dir: Path = DATA_DIR, seed: int = RANDOM_SEED) 
 
 def main() -> None:
     """Run the synthetic data CLI."""
+    configure_logging()
     parser = argparse.ArgumentParser(description="Generate deterministic synthetic data.")
     parser.add_argument("--export", action="store_true", help="Export generated CSV files.")
     parser.add_argument("--seed", type=int, default=RANDOM_SEED, help="Deterministic seed.")
@@ -544,11 +550,11 @@ def main() -> None:
     if args.export:
         paths = export_synthetic_data(seed=args.seed)
         for path in paths.values():
-            print(path)
+            LOGGER.info("Exported %s", path)
     else:
         dataset = generate_synthetic_dataset(seed=args.seed)
         for table_name, frame in dataset.items():
-            print(f"{table_name}: {len(frame)} rows")
+            LOGGER.info("%s: %d rows", table_name, len(frame))
 
 
 if __name__ == "__main__":

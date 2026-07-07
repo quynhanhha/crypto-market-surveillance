@@ -34,6 +34,7 @@ from src.ui.pages import (
     overview_page,
     synthetic_cases_page,
 )
+from src.utils.logging import configure_logging
 
 
 APP_TITLE = "Crypto Market Surveillance Analytics"
@@ -57,6 +58,7 @@ SIDEBAR_WIDTH_STYLE = """
 
 def main() -> None:
     """Render the six-page Streamlit surveillance dashboard."""
+    configure_logging()
     st.set_page_config(
         page_title="Crypto Market Surveillance",
         layout="wide",
